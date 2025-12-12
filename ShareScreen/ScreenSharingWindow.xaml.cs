@@ -2,33 +2,62 @@
 using CommunicationLibrary.Models;
 using HelpersLibrary.Helpers;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.Drawing;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 
 namespace ShareScreen
 {
+    /// <summary>
+    /// Interaction logic for ScreenSharingWindow.xaml
+    /// </summary>
     public partial class ScreenSharingWindow : Window, INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
-        private void NotifyPropertyChanged([CallerMemberName] string prop = "")
+        private void NotifyPropertyChanged([CallerMemberName] String propertyName = "")
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         Timer _mouseTimer = new Timer(500);
         Timer _keyboardTimer = new Timer(700);
+        public BitmapImage ToImage(byte[] array)
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad; // here
+            image.StreamSource = new System.IO.MemoryStream(array);
+            image.EndInit();
+            return image;
+        }
 
         private BitmapImage _image;
         public BitmapImage Image
         {
             get => _image;
-            set { _image = value; NotifyPropertyChanged(); }
+            set
+            {
+                _image = value;
+                NotifyPropertyChanged();
+            }
         }
 
         private byte[] _imageData;
@@ -40,105 +69,47 @@ namespace ShareScreen
                 _imageData = value;
                 NotifyPropertyChanged();
 
-                Dispatcher.Invoke(() =>
-                {
-                    if (_imageData != null)
-                        Image = ToImage(_imageData);
-                });
+                Dispatcher.Invoke(() => Image = ToImage(ImageData));
             }
         }
 
         public float OriginalWidth { get; set; }
         public float OriginalHeight { get; set; }
 
-        private readonly string _host;
-        private bool _mouseUp;
-
+        string _host;
+        bool _mouseUp;
         public ScreenSharingWindow(string host)
         {
             InitializeComponent();
             DataContext = this;
-
-            _host = host;
-
             _mouseTimer.AutoReset = false;
             _keyboardTimer.AutoReset = false;
+            _host = host;
         }
 
-        // =====================================================================
-        // Converte byte[] -> BitmapImage
-        // =====================================================================
-        public BitmapImage ToImage(byte[] arr)
-        {
-            try
-            {
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.StreamSource = new MemoryStream(arr);
-                bmp.EndInit();
-                bmp.Freeze();
-                return bmp;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        // =====================================================================
-        // Converte coordenadas exibidas → resolução original
-        // =====================================================================
-        private System.Drawing.Point ConvertPosition(MouseEventArgs e)
-        {
-            if (ss.Source == null || OriginalWidth == 0 || OriginalHeight == 0)
-                return new System.Drawing.Point(0, 0);
-
-            double xFactor = OriginalWidth / ss.ActualWidth;
-            double yFactor = OriginalHeight / ss.ActualHeight;
-
-            var p = e.GetPosition(ss);
-
-            return new System.Drawing.Point(
-                (int)(p.X * xFactor),
-                (int)(p.Y * yFactor)
-            );
-        }
-
-        // =====================================================================
-        // MOUSE MOVE
-        // =====================================================================
         private void ImageHolder_MouseMove(object sender, MouseEventArgs e)
         {
-            var p = ConvertPosition(e);
+            System.Drawing.Point p = new System.Drawing.Point((int)(e.GetPosition(ss).X * (OriginalWidth / ss.ActualWidth)), (int)(e.GetPosition(ss).Y * (OriginalHeight / ss.ActualHeight)));
             Communicator.Instance.ProduceMouseMove(p.X, p.Y, _host);
         }
 
-        // =====================================================================
-        // MOUSE DOWN / CLICK / DOUBLE CLICK INTELIGENTE
-        // =====================================================================
         private void ImageHolder_MouseDown(object sender, MouseButtonEventArgs e)
         {
             _mouseUp = false;
-
-            // Double Click
             if (e.ClickCount == 2)
             {
                 Communicator.Instance.Produce(
-                    new InputDataComm()
-                    {
-                        DataType = MessageTypeComm.MouseDoubleClick,
-                        MouseData = e.ChangedButton.Map()
-                    },
-                    _host);
+                new InputDataComm()
+                {
+                    DataType = MessageTypeComm.MouseDoubleClick,
+                    MouseData = e.ChangedButton.Map()
+                }, _host);
                 return;
             }
 
-            // Detecção se é click rápido ou hold
             Task.Run(() =>
             {
                 System.Threading.Thread.Sleep(130);
-
                 if (_mouseUp)
                 {
                     Communicator.Instance.Produce(
@@ -169,13 +140,16 @@ namespace ShareScreen
                 {
                     DataType = MessageTypeComm.MouseUp,
                     MouseData = e.ChangedButton.Map()
-                },
-                _host);
+                }, _host);
+            //WindowsInputHelper.MouseUp(e.ChangedButton.Map());
         }
 
-        // =====================================================================
-        // TECLADO
-        // =====================================================================
+        private void Window_MouseEnter(object sender, MouseEventArgs e)
+        {
+            this.Focus();
+            Keyboard.Focus(this);
+        }
+
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             if (!_keyboardTimer.Enabled)
@@ -186,26 +160,20 @@ namespace ShareScreen
                 {
                     DataType = MessageTypeComm.KeyboardDown,
                     KeyboardData = e.Key.Map()
-                },
-                _host);
+                }, _host);
         }
 
         private void Window_KeyUp(object sender, KeyEventArgs e)
         {
+            //if (_mouseTimer.Enabled)
+            //    WindowsInputHelper.KeyPress(e.Key.Map());
+
             Communicator.Instance.Produce(
                 new InputDataComm()
                 {
                     DataType = MessageTypeComm.KeyboardUp,
                     KeyboardData = e.Key.Map()
-                },
-                _host);
-        }
-
-        // =====================================================================
-        private void Window_MouseEnter(object sender, MouseEventArgs e)
-        {
-            this.Focus();
-            Keyboard.Focus(this);
+                }, _host);
         }
 
         private void Window_MouseLeave(object sender, MouseEventArgs e)

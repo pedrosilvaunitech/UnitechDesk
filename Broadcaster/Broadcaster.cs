@@ -1,14 +1,20 @@
 ﻿using Microsoft.Owin.Hosting;
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Diagnostics;
+using System.Linq;
 using System.ServiceProcess;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace Broadcaster
 {
     public partial class Broadcaster : ServiceBase
     {
-        public string SignalRAddress = "http://*:7717/";
+        public string SignalRAddress = "http://+:7717/";
         private IDisposable _serverSignalR = null;
-
         public Broadcaster()
         {
             InitializeComponent();
@@ -18,30 +24,17 @@ namespace Broadcaster
         {
             try
             {
-                // Inicializa o SignalR
                 _serverSignalR = WebApp.Start<StartUpSignalR>(url: SignalRAddress);
-                Console.WriteLine("SignalR server started at " + SignalRAddress);
-
-                // Aqui você poderá iniciar a captura de tela depois
-                // Ex: CaptureSender.Start();
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error starting service: " + ex.Message);
+
             }
         }
 
         protected override void OnStop()
         {
-            try
-            {
-                _serverSignalR?.Dispose();
-                Console.WriteLine("Service stopped.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error stopping service: " + ex.Message);
-            }
+            _serverSignalR.Dispose();
         }
 
         internal void Start()
