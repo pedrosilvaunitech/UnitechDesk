@@ -1,0 +1,28 @@
+﻿<Window x:Class="ShareScreen.ScreenSharingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="ScreenSharingWindow"
+        Height="450"
+        Width="800"
+        Background="Black"
+        MouseEnter="Window_MouseEnter"
+        MouseLeave="Window_MouseLeave"
+        KeyDown="Window_KeyDown"
+        KeyUp="Window_KeyUp">
+
+    <Grid>
+
+        <!-- A imagem do streaming remoto -->
+        <Image x:Name="ss"
+               Source="{Binding Image}"
+               Stretch="Uniform"
+               RenderOptions.BitmapScalingMode="HighQuality"
+               MouseMove="ImageHolder_MouseMove"
+               MouseDown="ImageHolder_MouseDown"
+               MouseUp="ImageHolder_MouseUp"/>
+
+    </Grid>
+</Window>
